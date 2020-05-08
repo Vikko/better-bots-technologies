@@ -28,38 +28,36 @@ function create_flow_button(player)
 	end
 end
 
-function init(event)
+Event.register({Event.core_events.init}, function(event)
 	for _, player in pairs(game.players) do
 		create_flow_button(player)
 	end
-end
+end)
 
-function configuration_changed(event)
+Event.register({Event.core_events.configuration_changed}, function(event)
 	for _, player in pairs(game.players) do
 		create_flow_button(player)
 	end
-end
+end)
 
---Event.register({defines.events.on_player_created}, function(event)
-function player_created(event)
+Event.register({defines.events.on_player_created}, function(event)
 	local player = game.players[event.player_index]
 
 	for _, player in pairs(game.players) do
 		create_flow_button(player)
 	end
-end
 
---Event.register({defines.events.on_runtime_mod_setting_changed}, function(event)
-function settings_changed(event)
+end)
+
+Event.register({defines.events.on_runtime_mod_setting_changed}, function(event)
 	local player = game.players[event.player_index]
 
 	show_gui = settings.global["betterbots-show-gui"].value
 	
 	create_flow_button(player)
-end
+end)
 
---Event.register({defines.events.on_gui_click}, function(event)
-function gui_click(event)
+Event.register({defines.events.on_gui_click}, function(event)
 	local gui = event.element
 	local player = game.players[event.player_index]
 	if not (player and player.valid and gui and gui.valid) then return end
@@ -139,14 +137,14 @@ function gui_click(event)
 		end
 	end
 	return
-end
+end)
 
-function gui_closed(event)
+script.on_event(defines.events.on_gui_closed, function(event)
 	if event.gui_type == defines.gui_type.custom and event.element and
 		event.element.name == "betterbots_confirm_box" then
 		event.element.destroy()
 	end
-end
+end)
 
 function set_roboports_charting_range(tech_level)
 	if not tech_level then return end
@@ -184,7 +182,7 @@ end
 -- Charting code
 -- Each second: chart a slice of the charting_ports table to reduce the performance hit of doing it all in one go
 -- Every 5 seconds: sanitize che charting_ports array by removing invalid entries and queueing newly added ones
-function on_tick(n)
+script.on_nth_tick(60, function(n)
     if not global.charting_ports then return end
 	
 	local tick = n.tick
@@ -211,11 +209,10 @@ function on_tick(n)
 			end
 		end
 	end
-end
+end)
 
 
---Event.register({defines.events.on_player_setup_blueprint, defines.events.on_player_configured_blueprint}, function(event)
-function player_blueprint(event)
+Event.register({defines.events.on_player_setup_blueprint, defines.events.on_player_configured_blueprint}, function(event)
     local player = game.players[event.player_index]
     if not player.valid then return end
 
@@ -244,10 +241,9 @@ function player_blueprint(event)
     if modified then
         stack.set_blueprint_entities(entities)
     end
-end
+end)
 
---Event.register(defines.events.on_research_finished, function(event)
-function research_finished(event)
+Event.register(defines.events.on_research_finished, function(event)
     local tech_name = event.research.name
     local force = event.research.force
 	
@@ -260,14 +256,13 @@ function research_finished(event)
 		Scheduler.queue_task(set_roboports_charting_range, calculate_betterbots_tech_levels(force).charting_tech_level)
 		Scheduler.close_queue()
 	end
-end
+end)
 
 -- ON_TICK event handler
 --
 -- 1) Manages all modified blueprints swapping any betterbots roboport with vanilla ones
 -- 2) Calls player.pipette_entity("roboport") on the player in global.pipette_roboports (second half of the "manually place a roboport over betterbots ghost" procedure)
---Event.register({defines.events.on_tick}, function(event)
-function on_tick(event)
+Event.register({defines.events.on_tick}, function(event)
 	if (not global.modified_bps or #global.modified_bps == 0) and (not global.pipette_roboports) then return end
 
 	-- 1)
@@ -296,10 +291,9 @@ function on_tick(event)
 	
 	global.modified_bps = { }
 	global.pipette_roboports = nil
-end
+end)
 
---Event.register({defines.events.on_put_item}, function(event)
-function put_roboport(event)
+Event.register({defines.events.on_put_item}, function(event)
 	local player = game.get_player(event.player_index)
 	local techs = calculate_betterbots_tech_levels(player.force)
 	local stack = player.cursor_stack
@@ -365,10 +359,9 @@ function put_roboport(event)
 			end
 		end
 	end
-end
+end)
 
---Event.register({defines.events.on_built_entity, defines.events.on_robot_built_entity}, function(event)
-function add_robotport(event)
+Event.register({defines.events.on_built_entity, defines.events.on_robot_built_entity}, function(event)
     local entity = event.created_entity
     local type = entity.type
     local name = entity.name
@@ -388,10 +381,9 @@ function add_robotport(event)
 	if name:starts_with('betterbots-roboport') then
 		manage_port_data(entity, techs)
 	end
-end
+end)
 
---Event.register({defines.events.on_entity_died, defines.events.on_robot_pre_mined, defines.events.on_player_mined_entity}, function(event)
-function remove_roboport(event)
+Event.register({defines.events.on_entity_died, defines.events.on_robot_pre_mined, defines.events.on_player_mined_entity}, function(event)
     local entity = event.entity
     local type = entity.type
     local name = entity.name
@@ -405,7 +397,7 @@ function remove_roboport(event)
 			end)
 		end
     end
-end
+end)
 
 function manage_port_data(port, techs)
 	if not port or not port.valid then return nil end
@@ -505,7 +497,9 @@ function upgrade_roboport_entity(port, techs)
 	-- The control behavior must be treated like this... it sucks but i couldn't come up with a better solution
 	local c_be = port.get_or_create_control_behavior()
 	local previous_control_behavior = {
-		mode_of_operations = c_be.mode_of_operations,
+		-- mode_of_operations = c_be.mode_of_operations,
+		read_logistics = c_be.read_logistics,
+		read_robot_stats = c_be.read_robot_stats,
 		available_logistic_output_signal = c_be.available_logistic_output_signal,
 		total_logistic_output_signal = c_be.total_logistic_output_signal,
 		available_construction_output_signal = c_be.available_construction_output_signal,
@@ -570,7 +564,8 @@ function upgrade_roboport_entity(port, techs)
 		position = pos,
 		force = force,
 		direction = dir,
-		create_build_effect_smoke = false
+		create_build_effect_smoke = false,
+		raise_built = true
 	})
 		
 	newPort.health = health
@@ -620,7 +615,9 @@ function upgrade_ghost_roboport(port, techs)
 	
 	local c_be = port.get_or_create_control_behavior()
 	local previous_control_behavior = {
-		mode_of_operations = c_be.mode_of_operations,
+		-- mode_of_operations = c_be.mode_of_operations,
+		read_logistics = c_be.read_logistics,
+		read_robot_stats = c_be.read_robot_stats,
 		available_logistic_output_signal = c_be.available_logistic_output_signal,
 		total_logistic_output_signal = c_be.total_logistic_output_signal,
 		available_construction_output_signal = c_be.available_construction_output_signal,
@@ -641,7 +638,8 @@ function upgrade_ghost_roboport(port, techs)
 		direction = dir,
 		create_build_effect_smoke = false,
 		ghost_type = "roboport",
-		ghost_name = "roboport"
+		ghost_name = "roboport",
+		raise_built = true
 	})
 	
 	local n_be = newPort.get_or_create_control_behavior()
@@ -735,20 +733,3 @@ function calculate_betterbots_tech_levels(force)
 		charting_tech_level = calculate_tech_level(force, 'charting-roboports', 2)
 	}
 end
-
-script.on_event(defines.events.on_entity_died, remove_roboport)
-script.on_event(defines.events.on_robot_pre_mined, remove_roboport)
-script.on_event(defines.events.on_player_mined_entity, remove_roboport)
-script.on_event(defines.events.on_built_entity, add_roboport)
-script.on_event(defines.events.on_robot_built_entity, add_roboport)
-script.on_event(defines.events.on_put_item, put_roboport)
-script.on_event(defines.events.on_research_finished, research_finished)
-script.on_event(defines.events.on_player_setup_blueprint, player_blueprint)
-script.on_event(defines.events.on_player_configured_blueprint, player_blueprint)
-script.on_event(defines.events.on_player_created, player_created)
-script.on_event(defines.events.on_gui_click, gui_click)
-script.on_event(defines.events.on_gui_closed, gui_closed)
-script.on_event({defines.events.on_runtime_mod_setting_changed}, settings_changed)
-script.on_nth_tick(60, on_tick)
-script.on_init(init)
-script.on_configuration_changed(configuration_changed)
